@@ -14,7 +14,7 @@ import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
 public class Loader implements IXposedHookLoadPackage {
-    private static final String LIB_NAME = "proxy-loader";
+    private static final String LIB_NAME = "hello-world";
 
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
