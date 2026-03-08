@@ -18,6 +18,7 @@ public class Loader implements IXposedHookLoadPackage, IXposedHookZygoteInit {
     private static final String MODULE_PACKAGE_NAME = "com.kinocrp.lsposedloader";
     private static final String LIB_NAME = "hello-world";
     private static String globalModulePath = null;
+    private static boolean hasInjected = false;
 
     @Override
     public void initZygote(StartupParam startupParam) throws Throwable {
@@ -26,13 +27,19 @@ public class Loader implements IXposedHookLoadPackage, IXposedHookZygoteInit {
 
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
-        XposedHelpers.findAndHookMethod(android.app.Application.class, "onCreate", new XC_MethodHook() {
+        XposedHelpers.findAndHookMethod("android.content.ContextWrapper", lpparam.classLoader, "attachBaseContext", Context.class, new XC_MethodHook() {
             @Override
             protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                Context appContext = (Context) param.thisObject;
+                if (hasInjected) return;
+
+                hasInjected = true;
+
+                Log.i("Kinocrp", "[+] attachBaseContext fired! Grabbing Context...");
+                Context appContext = (Context) param.args[0];
 
                 new Thread(() -> {
                     try {
+                        Log.i("Kinocrp", "[*] Thread sleeping for 3 seconds...");
                         Thread.sleep(3000);
                         extractAndLoadStealthy(appContext);
                     } catch (Exception e) {
