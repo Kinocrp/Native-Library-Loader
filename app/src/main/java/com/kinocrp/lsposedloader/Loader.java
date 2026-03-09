@@ -34,13 +34,11 @@ public class Loader implements IXposedHookLoadPackage, IXposedHookZygoteInit {
 
                 hasInjected = true;
 
-                Log.i("Kinocrp", "[+] attachBaseContext fired! Grabbing Context...");
                 Context appContext = (Context) param.args[0];
 
                 new Thread(() -> {
                     try {
-                        Log.i("Kinocrp", "[*] Thread sleeping for 3 seconds...");
-                        Thread.sleep(3000);
+                        Log.i("Kinocrp", "[+] Injecting...");
                         extractAndLoadStealthy(appContext);
                     } catch (Exception e) {
                         Log.e("Kinocrp", "[-] Thread error", e);
@@ -85,7 +83,7 @@ public class Loader implements IXposedHookLoadPackage, IXposedHookZygoteInit {
 
             } finally {
                 if (tempLib.exists() && tempLib.delete()) {
-                    Log.i("Kinocrp", "[+] Temp file cleanup");
+                    Log.i("Kinocrp", "[+] Cleaning...");
                 }
             }
 
