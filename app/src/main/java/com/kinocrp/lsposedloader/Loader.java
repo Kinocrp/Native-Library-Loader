@@ -32,20 +32,19 @@ public class Loader implements IXposedHookLoadPackage, IXposedHookZygoteInit {
         new Thread(() -> {
             Log.i("Kinocrp", "[+] Waiting...");
             Context context = null;
-            while (context == null) {
+            while (true) {
                 try {
                     context = getContextByReflection();
+                    if (context != null) {
+                        hasInjected = true;
+                        Thread.sleep(3000);
+                        Log.i("Kinocrp", "[+] Injecting...");
+                        extractAndLoad(context);
+                        break;
+                    }
                     Thread.sleep(10);
                 } catch (InterruptedException e) {}
             }
-
-            try {
-                Thread.sleep(3000);
-            } catch (InterruptedException e) {}
-
-            hasInjected = true;
-            Log.i("Kinocrp", "[+] Injecting...");
-            extractAndLoad(context);
         }).start();
     }
 
