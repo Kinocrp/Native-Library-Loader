@@ -1,24 +1,25 @@
 package com.kinocrp.lsposedloader;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.util.Log;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.lang.reflect.Method;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.IXposedHookZygoteInit;
-import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
 public class Loader implements IXposedHookLoadPackage, IXposedHookZygoteInit {
     private static final String MODULE_PACKAGE_NAME = "com.kinocrp.lsposedloader";
     private static final String LIB_NAME = "hello-world";
     private static String globalModulePath = null;
-    private static boolean hasInjected = false;
+    private static volatile boolean hasInjected = false;
 
     @Override
     public void initZygote(StartupParam startupParam) throws Throwable {
@@ -27,28 +28,58 @@ public class Loader implements IXposedHookLoadPackage, IXposedHookZygoteInit {
 
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lpparam) throws Throwable {
-        XposedHelpers.findAndHookMethod("android.content.ContextWrapper", lpparam.classLoader, "attachBaseContext", Context.class, new XC_MethodHook() {
-            @Override
-            protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                if (hasInjected) return;
-                hasInjected = true;
-
-                Context appContext = (Context) param.args[0];
-                new Thread(() -> {
-                    try {
-                        Log.i("Kinocrp", "[+] Injecting...");
-                        extractAndLoadStealthy(appContext);
-                    } catch (Exception e) {
-                        Log.e("Kinocrp", "[-] Thread error", e);
-                    }
-                }).start();
+        if (hasInjected) return;
+        new Thread(() -> {
+            Log.i("Kinocrp", "[+] Waiting...");
+            Context context = null;
+            while (context == null) {
+                try {
+                    context = getContextByReflection();
+                    Thread.sleep(10);
+                } catch (InterruptedException e) {}
             }
-        });
+
+            try {
+                Thread.sleep(3000);
+            } catch (InterruptedException e) {}
+
+            hasInjected = true;
+            Log.i("Kinocrp", "[+] Injecting...");
+            extractAndLoad(context);
+        }).start();
     }
 
-    private void extractAndLoadStealthy(Context appContext) {
+    @SuppressLint("PrivateApi")
+    private Context getContextByReflection() {
         try {
-            String targetAbi = android.os.Process.is64Bit() ? "arm64-v8a" : "armeabi-v7a";
+            Class<?> activityThreadClass = Class.forName("android.app.ActivityThread");
+            Method currentApplicationMethod = activityThreadClass.getDeclaredMethod("currentApplication");
+            currentApplicationMethod.setAccessible(true);
+            Object app = currentApplicationMethod.invoke(null);
+            return (Context) app;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private void extractAndLoad(Context appContext) {
+        try {
+            String nativeLibDir = appContext.getApplicationInfo().nativeLibraryDir;
+            Log.i("Kinocrp", "[+] Native Library Dir: " + nativeLibDir);
+
+            String targetAbi;
+            if (nativeLibDir.contains("arm64")) {
+                targetAbi = "arm64-v8a";
+            } else if (nativeLibDir.contains("arm")) {
+                targetAbi = "armeabi-v7a";
+            } else if (nativeLibDir.contains("x86_64")) {
+                targetAbi = "x86_64";
+            } else {
+                targetAbi = "x86";
+            }
+
+            Log.i("Kinocrp", "[+] ABI: " + targetAbi);
+
             String apkPath = getModuleApkPath(appContext);
             if (apkPath == null) {
                 Log.e("Kinocrp", "[-] Could not find module APK on disk");
@@ -68,7 +99,7 @@ public class Loader implements IXposedHookLoadPackage, IXposedHookZygoteInit {
                 }
 
                 try (InputStream in = zipFile.getInputStream(entry);
-                        FileOutputStream out = new FileOutputStream(tempLib)) {
+                     FileOutputStream out = new FileOutputStream(tempLib)) {
                     byte[] buffer = new byte[8192];
                     int len;
                     while ((len = in.read(buffer)) > 0) {
@@ -94,15 +125,8 @@ public class Loader implements IXposedHookLoadPackage, IXposedHookZygoteInit {
         File lspatchDir = new File(appContext.getCacheDir(), "lspatch/" + MODULE_PACKAGE_NAME);
         if (lspatchDir.exists() && lspatchDir.isDirectory()) {
             File[] files = lspatchDir.listFiles((dir, name) -> name.endsWith(".apk"));
-            if (files != null && files.length > 0) {
-                return files[0].getAbsolutePath();
-            }
+            if (files != null && files.length > 0) return files[0].getAbsolutePath();
         }
-
-        if (globalModulePath != null) {
-            return globalModulePath;
-        }
-
-        return null;
+        return globalModulePath;
     }
 }
