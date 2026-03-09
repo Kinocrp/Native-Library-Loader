@@ -31,11 +31,9 @@ public class Loader implements IXposedHookLoadPackage, IXposedHookZygoteInit {
             @Override
             protected void afterHookedMethod(MethodHookParam param) throws Throwable {
                 if (hasInjected) return;
-
                 hasInjected = true;
 
                 Context appContext = (Context) param.args[0];
-
                 new Thread(() -> {
                     try {
                         Log.i("Kinocrp", "[+] Injecting...");
@@ -70,7 +68,7 @@ public class Loader implements IXposedHookLoadPackage, IXposedHookZygoteInit {
                 }
 
                 try (InputStream in = zipFile.getInputStream(entry);
-                     FileOutputStream out = new FileOutputStream(tempLib)) {
+                        FileOutputStream out = new FileOutputStream(tempLib)) {
                     byte[] buffer = new byte[8192];
                     int len;
                     while ((len = in.read(buffer)) > 0) {
